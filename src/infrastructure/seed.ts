@@ -24,10 +24,13 @@ async function seed() {
     // Anomaly injection periods
     const nighttimeAnomalyStart = new Date("2025-08-10T00:00:00Z");
     const nighttimeAnomalyEnd = new Date("2025-08-12T23:59:59Z");
+    const zeroGenerationAnomalyStart = new Date("2025-08-20T00:00:00Z");
+    const zeroGenerationAnomalyEnd = new Date("2025-08-22T23:59:59Z");
 
     let currentDate = new Date(startDate);
     let recordCount = 0;
-    let anomalyCount = 0;
+    let nighttimeAnomalyCount = 0;
+    let zeroGenerationAnomalyCount = 0;
 
     while (currentDate <= endDate) {
       // Generate realistic energy values based on time of day and season
@@ -78,7 +81,19 @@ async function seed() {
           // During night hours, inject abnormal generation
           energyGenerated = Math.round(30 + Math.random() * 50); // 30-80 Wh at night
           injectedAnomaly = "NIGHTTIME_GENERATION";
-          anomalyCount++;
+          nighttimeAnomalyCount++;
+        }
+      }
+
+      // ANOMALY INJECTION: Zero Generation on Clear Sky Days (Aug 20-22, 2025)
+      // Simulate panel disconnection or complete system failure during peak hours
+      if (currentDate >= zeroGenerationAnomalyStart && currentDate <= zeroGenerationAnomalyEnd) {
+        // Only during peak sun hours (10am-2pm) when generation should be highest
+        if (hour >= 10 && hour <= 14) {
+          // Force zero generation during peak hours (indicates system failure)
+          energyGenerated = 0;
+          injectedAnomaly = "ZERO_GENERATION_CLEAR_SKY";
+          zeroGenerationAnomalyCount++;
         }
       }
 
@@ -98,7 +113,8 @@ async function seed() {
     console.log(
       `Database seeded successfully. Generated ${recordCount} energy generation records from ${startDate.toUTCString()} to ${endDate.toUTCString()}.`
     );
-    console.log(`Injected ${anomalyCount} NIGHTTIME_GENERATION anomalies (Aug 10-12, 2025).`);
+    console.log(`Injected ${nighttimeAnomalyCount} NIGHTTIME_GENERATION anomalies (Aug 10-12, 2025).`);
+    console.log(`Injected ${zeroGenerationAnomalyCount} ZERO_GENERATION_CLEAR_SKY anomalies (Aug 20-22, 2025).`);
   } catch (err) {
     console.error("Seeding error:", err);
   } finally {
