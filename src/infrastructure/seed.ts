@@ -21,8 +21,13 @@ async function seed() {
     const startDate = new Date("2025-08-01T08:00:00Z"); // August 1, 2025 8pm UTC
     const endDate = new Date("2025-11-23T08:00:00Z"); // November 23, 2025 8am UTC
 
+    // Anomaly injection periods
+    const nighttimeAnomalyStart = new Date("2025-08-10T00:00:00Z");
+    const nighttimeAnomalyEnd = new Date("2025-08-12T23:59:59Z");
+
     let currentDate = new Date(startDate);
     let recordCount = 0;
+    let anomalyCount = 0;
 
     while (currentDate <= endDate) {
       // Generate realistic energy values based on time of day and season
@@ -61,14 +66,27 @@ async function seed() {
 
       // Add some random variation (±20%)
       const variation = 0.8 + Math.random() * 0.4;
-      const energyGenerated = Math.round(
+      let energyGenerated = Math.round(
         baseEnergy * timeMultiplier * variation
       );
+
+      // ANOMALY INJECTION: Nighttime Generation (Aug 10-12, 2025)
+      // Simulate sensor malfunction causing nighttime readings
+      let injectedAnomaly = null;
+      if (currentDate >= nighttimeAnomalyStart && currentDate <= nighttimeAnomalyEnd) {
+        if (hour >= 18 || hour < 6) {
+          // During night hours, inject abnormal generation
+          energyGenerated = Math.round(30 + Math.random() * 50); // 30-80 Wh at night
+          injectedAnomaly = "NIGHTTIME_GENERATION";
+          anomalyCount++;
+        }
+      }
 
       records.push({
         serialNumber: serialNumber,
         timestamp: new Date(currentDate),
         energyGenerated: energyGenerated,
+        injectedAnomaly: injectedAnomaly,
       });
 
       // Move to next 2-hour interval
@@ -80,6 +98,7 @@ async function seed() {
     console.log(
       `Database seeded successfully. Generated ${recordCount} energy generation records from ${startDate.toUTCString()} to ${endDate.toUTCString()}.`
     );
+    console.log(`Injected ${anomalyCount} NIGHTTIME_GENERATION anomalies (Aug 10-12, 2025).`);
   } catch (err) {
     console.error("Seeding error:", err);
   } finally {
