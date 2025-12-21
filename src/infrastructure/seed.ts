@@ -26,11 +26,14 @@ async function seed() {
     const nighttimeAnomalyEnd = new Date("2025-08-12T23:59:59Z");
     const zeroGenerationAnomalyStart = new Date("2025-08-20T00:00:00Z");
     const zeroGenerationAnomalyEnd = new Date("2025-08-22T23:59:59Z");
+    const overproductionAnomalyStart = new Date("2025-09-05T00:00:00Z");
+    const overproductionAnomalyEnd = new Date("2025-09-07T23:59:59Z");
 
     let currentDate = new Date(startDate);
     let recordCount = 0;
     let nighttimeAnomalyCount = 0;
     let zeroGenerationAnomalyCount = 0;
+    let overproductionAnomalyCount = 0;
 
     while (currentDate <= endDate) {
       // Generate realistic energy values based on time of day and season
@@ -73,12 +76,18 @@ async function seed() {
         baseEnergy * timeMultiplier * variation
       );
 
+      // Ensure night hours have exactly 0 unless it's an anomaly
+      if (timeMultiplier === 0) {
+        energyGenerated = 0;
+      }
+
       // ANOMALY INJECTION: Nighttime Generation (Aug 10-12, 2025)
       // Simulate sensor malfunction causing nighttime readings
+      // Only inject at specific hours to limit count: 20:00, 22:00, 02:00 (3 per day × 3 days = 9 total)
       let injectedAnomaly = null;
       if (currentDate >= nighttimeAnomalyStart && currentDate <= nighttimeAnomalyEnd) {
-        if (hour >= 18 || hour < 6) {
-          // During night hours, inject abnormal generation
+        if (hour === 20 || hour === 22 || hour === 2) {
+          // During specific night hours, inject abnormal generation
           energyGenerated = Math.round(30 + Math.random() * 50); // 30-80 Wh at night
           injectedAnomaly = "NIGHTTIME_GENERATION";
           nighttimeAnomalyCount++;
@@ -87,13 +96,26 @@ async function seed() {
 
       // ANOMALY INJECTION: Zero Generation on Clear Sky Days (Aug 20-22, 2025)
       // Simulate panel disconnection or complete system failure during peak hours
+      // Only inject at noon (12:00) to limit count (1 per day × 3 days = 3 total)
       if (currentDate >= zeroGenerationAnomalyStart && currentDate <= zeroGenerationAnomalyEnd) {
-        // Only during peak sun hours (10am-2pm) when generation should be highest
-        if (hour >= 10 && hour <= 14) {
-          // Force zero generation during peak hours (indicates system failure)
+        if (hour === 12) {
+          // Force zero generation during peak noon hour (indicates system failure)
           energyGenerated = 0;
           injectedAnomaly = "ZERO_GENERATION_CLEAR_SKY";
           zeroGenerationAnomalyCount++;
+        }
+      }
+
+      // ANOMALY INJECTION: Overproduction (Sep 5-7, 2025)
+      // Simulate sensor malfunction/calibration error causing readings >120% of rated capacity
+      // Inject at peak hours (12:00, 14:00) to limit count (2 per day × 3 days = 6 total)
+      // Rated capacity: 500W × 2 hours = 1000 Wh max, so >1200 Wh is abnormal
+      if (currentDate >= overproductionAnomalyStart && currentDate <= overproductionAnomalyEnd) {
+        if (hour === 12 || hour === 14) {
+          // Generate extremely high values (1300-1500 Wh, which is 130-150% of max capacity)
+          energyGenerated = Math.round(1300 + Math.random() * 200);
+          injectedAnomaly = "OVERPRODUCTION";
+          overproductionAnomalyCount++;
         }
       }
 
@@ -115,6 +137,7 @@ async function seed() {
     );
     console.log(`Injected ${nighttimeAnomalyCount} NIGHTTIME_GENERATION anomalies (Aug 10-12, 2025).`);
     console.log(`Injected ${zeroGenerationAnomalyCount} ZERO_GENERATION_CLEAR_SKY anomalies (Aug 20-22, 2025).`);
+    console.log(`Injected ${overproductionAnomalyCount} OVERPRODUCTION anomalies (Sep 5-7, 2025).`);
   } catch (err) {
     console.error("Seeding error:", err);
   } finally {
