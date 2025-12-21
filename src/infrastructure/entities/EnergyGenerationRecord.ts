@@ -19,17 +19,28 @@ const energyGenerationRecordSchema = new mongoose.Schema({
     min: 0.1,
     max: 24,
   },
+  // Weather conditions at the time of measurement (simulated for testing)
+  weatherCondition: {
+    type: String,
+    enum: ["clear", "partly_cloudy", "overcast", "rain"],
+    required: false,
+  },
+  cloudCover: {
+    type: Number, // 0-100%
+    required: false,
+  },
   // For testing/debugging anomaly detection
   injectedAnomaly: {
     type: String,
     enum: [
       "NIGHTTIME_GENERATION",
       "ZERO_GENERATION_CLEAR_SKY",
-      "OVERPRODUCTION",
+      "ENERGY_EXCEEDING_THRESHOLD",
       "HIGH_GENERATION_BAD_WEATHER",
       "LOW_GENERATION_CLEAR_WEATHER",
       "SUDDEN_PRODUCTION_DROP",
       "ERRATIC_OUTPUT",
+      "FROZEN_GENERATION",
     ],
     required: false,
   },
