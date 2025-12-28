@@ -8,6 +8,8 @@ dotenv.config();
 async function seed() {
 
   const serialNumber = "SU-0001";
+  const TOTAL_DAYS = 30; // keep analytics windows fresh
+  const intervalHours = 2;
 
   try {
     // Connect to DB
@@ -29,35 +31,26 @@ async function seed() {
     endDate.setHours(23, 59, 59, 999); // End of today
 
     const startDate = new Date(endDate);
-    startDate.setDate(startDate.getDate() - 90); // 90 days ago
-    startDate.setHours(0, 0, 0, 0); // Start of that day
+    startDate.setDate(startDate.getDate() - TOTAL_DAYS);
+    startDate.setHours(0, 0, 0, 0);
 
     // Anomaly injection periods (relative to today - spread across the 90 days)
     // Place anomalies at specific intervals for testing
-    const nighttimeAnomalyStart = new Date(endDate);
-    nighttimeAnomalyStart.setDate(nighttimeAnomalyStart.getDate() - 80); // 80 days ago
-    const nighttimeAnomalyEnd = new Date(nighttimeAnomalyStart);
-    nighttimeAnomalyEnd.setDate(nighttimeAnomalyEnd.getDate() + 2); // 2-day period
+    const anomalyWindow = (daysAgo: number, lengthDays: number) => {
+      const start = new Date(endDate);
+      start.setDate(start.getDate() - daysAgo);
+      start.setHours(0, 0, 0, 0);
+      const finish = new Date(start);
+      finish.setDate(finish.getDate() + lengthDays);
+      finish.setHours(23, 59, 59, 999);
+      return { start, finish };
+    };
 
-    const zeroGenerationAnomalyStart = new Date(endDate);
-    zeroGenerationAnomalyStart.setDate(zeroGenerationAnomalyStart.getDate() - 70); // 70 days ago
-    const zeroGenerationAnomalyEnd = new Date(zeroGenerationAnomalyStart);
-    zeroGenerationAnomalyEnd.setDate(zeroGenerationAnomalyEnd.getDate() + 2);
-
-    const thresholdCapacityAnomalyStart = new Date(endDate);
-    thresholdCapacityAnomalyStart.setDate(thresholdCapacityAnomalyStart.getDate() - 55); // 55 days ago
-    const thresholdCapacityAnomalyEnd = new Date(thresholdCapacityAnomalyStart);
-    thresholdCapacityAnomalyEnd.setDate(thresholdCapacityAnomalyEnd.getDate() + 2);
-
-    const weatherMismatchAnomalyStart = new Date(endDate);
-    weatherMismatchAnomalyStart.setDate(weatherMismatchAnomalyStart.getDate() - 45); // 45 days ago
-    const weatherMismatchAnomalyEnd = new Date(weatherMismatchAnomalyStart);
-    weatherMismatchAnomalyEnd.setDate(weatherMismatchAnomalyEnd.getDate() + 2);
-
-    const frozenGenerationAnomalyStart = new Date(endDate);
-    frozenGenerationAnomalyStart.setDate(frozenGenerationAnomalyStart.getDate() - 35); // 35 days ago
-    const frozenGenerationAnomalyEnd = new Date(frozenGenerationAnomalyStart);
-    frozenGenerationAnomalyEnd.setDate(frozenGenerationAnomalyEnd.getDate() + 1);
+    const nighttimeWindow = anomalyWindow(18, 1);
+    const zeroGenerationWindow = anomalyWindow(14, 1);
+    const thresholdWindow = anomalyWindow(11, 1);
+    const weatherMismatchWindow = anomalyWindow(8, 1);
+    const frozenWindow = anomalyWindow(5, 1);
 
     let currentDate = new Date(startDate);
     let recordCount = 0;
@@ -69,7 +62,6 @@ async function seed() {
     let frozenValue: number | null = null;
 
     // Calculate maximum energy per interval (capacity × 2 hours)
-    const intervalHours = 2;
     const maxEnergyPerInterval = solarUnitCapacity * intervalHours;
     console.log(`Maximum energy per ${intervalHours}h interval: ${maxEnergyPerInterval}Wh\n`);
 
@@ -80,19 +72,15 @@ async function seed() {
 
       // Base energy generation as percentage of max capacity (varies by season)
       // Using percentages ensures values scale with actual capacity
-      let baseEnergyPercent = 0.04; // 4% of max capacity for off-season
+      let baseEnergyPercent = 0.045; // baseline ~4.5% of max
       if (month >= 5 && month <= 7) {
-        // June-August (summer) - best conditions
-        baseEnergyPercent = 0.06; // 6% of max
+        baseEnergyPercent = 0.065;
       } else if (month >= 2 && month <= 4) {
-        // March-May (spring) - good conditions
-        baseEnergyPercent = 0.05; // 5% of max
+        baseEnergyPercent = 0.055;
       } else if (month >= 8 && month <= 10) {
-        // September-November (fall) - moderate conditions
-        baseEnergyPercent = 0.04; // 4% of max
+        baseEnergyPercent = 0.05;
       } else {
-        // December-February (winter) - poor conditions
-        baseEnergyPercent = 0.03; // 3% of max
+        baseEnergyPercent = 0.035;
       }
 
       let baseEnergy = maxEnergyPerInterval * baseEnergyPercent;
@@ -112,7 +100,7 @@ async function seed() {
       }
 
       // Add some random variation (±20%)
-      const variation = 0.8 + Math.random() * 0.4;
+      const variation = 0.85 + Math.random() * 0.3; // tighten spread for smoother curves
       let energyGenerated = Math.round(
         baseEnergy * timeMultiplier * variation
       );
@@ -153,10 +141,10 @@ async function seed() {
       // Simulate sensor malfunction causing nighttime readings
       // Only inject at specific hours to limit count: 20:00, 22:00, 02:00 (3 per day × 3 days = 9 total)
       let injectedAnomaly = null;
-      if (currentDate >= nighttimeAnomalyStart && currentDate <= nighttimeAnomalyEnd) {
-        if (hour === 20 || hour === 22 || hour === 2) {
+      if (currentDate >= nighttimeWindow.start && currentDate <= nighttimeWindow.finish) {
+        if (hour === 21 || hour === 0) {
           // During specific night hours, inject abnormal generation
-          energyGenerated = Math.round(30 + Math.random() * 50); // 30-80 Wh at night
+          energyGenerated = Math.round(20 + Math.random() * 40); // 20-60 Wh at night
           injectedAnomaly = "NIGHTTIME_GENERATION";
           nighttimeAnomalyCount++;
         }
@@ -165,7 +153,7 @@ async function seed() {
       // ANOMALY INJECTION: Zero Generation on Clear Sky Days (Aug 20-22, 2025)
       // Simulate panel disconnection or complete system failure during peak hours
       // Only inject at noon (12:00) to limit count (1 per day × 3 days = 3 total)
-      if (currentDate >= zeroGenerationAnomalyStart && currentDate <= zeroGenerationAnomalyEnd) {
+      if (currentDate >= zeroGenerationWindow.start && currentDate <= zeroGenerationWindow.finish) {
         if (hour === 12) {
           // Force zero generation during peak noon hour (indicates system failure)
           energyGenerated = 0;
@@ -179,8 +167,8 @@ async function seed() {
       // Inject at peak hours (12:00, 14:00) to limit count (2 per day × 3 days = 6 total)
       // Physical limit: capacity × intervalHours (e.g., 5000W × 2h = 10,000 Wh max)
       // Inject values > maxEnergyPerInterval (physically impossible)
-      if (currentDate >= thresholdCapacityAnomalyStart && currentDate <= thresholdCapacityAnomalyEnd) {
-        if (hour === 12 || hour === 14) {
+      if (currentDate >= thresholdWindow.start && currentDate <= thresholdWindow.finish) {
+        if (hour === 12) {
           // Generate values exceeding physical capacity (105-120% of max)
           const excessMin = maxEnergyPerInterval * 1.05;
           const excessMax = maxEnergyPerInterval * 1.20;
@@ -195,7 +183,7 @@ async function seed() {
       // Type 2: Low generation during clear weather (clear sky but low output)
       // Inject at peak hours: 12:00 (high gen bad weather), 14:00 (low gen clear weather)
       // 2 per day × 3 days = 6 total
-      if (currentDate >= weatherMismatchAnomalyStart && currentDate <= weatherMismatchAnomalyEnd) {
+      if (currentDate >= weatherMismatchWindow.start && currentDate <= weatherMismatchWindow.finish) {
         if (hour === 12) {
           // High generation during rain (should be ~30% but generating 80%+)
           weatherCondition = "rain";
@@ -217,7 +205,7 @@ async function seed() {
       // Simulate sensor freeze/stale data by repeating the same energy value for 12 consecutive intervals
       // This creates a 24-hour period where the value doesn't change despite weather variations
       // The frozen value will persist across weather changes, making it more obvious
-      if (currentDate >= frozenGenerationAnomalyStart && currentDate <= frozenGenerationAnomalyEnd) {
+      if (currentDate >= frozenWindow.start && currentDate <= frozenWindow.finish) {
         // Set frozen value at the start of the anomaly period
         if (frozenValue === null) {
           frozenValue = Math.round(baseEnergy * 1.2); // Lock at a moderate value (~300-400 Wh)
@@ -249,11 +237,11 @@ async function seed() {
     console.log(
       `Database seeded successfully. Generated ${recordCount} energy generation records from ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}.`
     );
-    console.log(`Injected ${nighttimeAnomalyCount} NIGHTTIME_GENERATION anomalies (~80 days ago).`);
-    console.log(`Injected ${zeroGenerationAnomalyCount} ZERO_GENERATION_CLEAR_SKY anomalies (~70 days ago).`);
-    console.log(`Injected ${thresholdCapacityAnomalyCount} ENERGY_EXCEEDING_THRESHOLD anomalies (~55 days ago).`);
-    console.log(`Injected ${weatherMismatchAnomalyCount} WEATHER_MISMATCH anomalies (~45 days ago).`);
-    console.log(`Injected ${frozenGenerationAnomalyCount} FROZEN_GENERATION anomalies (~35 days ago).`);
+    console.log(`Injected ${nighttimeAnomalyCount} NIGHTTIME_GENERATION anomalies (~2 nights).`);
+    console.log(`Injected ${zeroGenerationAnomalyCount} ZERO_GENERATION_CLEAR_SKY anomalies (~1 day).`);
+    console.log(`Injected ${thresholdCapacityAnomalyCount} ENERGY_EXCEEDING_THRESHOLD anomalies (~1 day).`);
+    console.log(`Injected ${weatherMismatchAnomalyCount} WEATHER_MISMATCH anomalies (~1 day).`);
+    console.log(`Injected ${frozenGenerationAnomalyCount} FROZEN_GENERATION anomalies (~1 day).`);
   } catch (err) {
     console.error("Seeding error:", err);
   } finally {
