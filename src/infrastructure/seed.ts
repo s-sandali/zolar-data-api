@@ -23,22 +23,41 @@ async function seed() {
     // Clear existing data
     await EnergyGenerationRecord.deleteMany({});
 
-    // Create historical energy generation records from Aug 1, 2025 8pm to Oct 12, 2025 8am every 2 hours
+    // Create historical energy generation records for the last 90 days (ending today)
     const records = [];
-    const startDate = new Date("2025-08-01T08:00:00Z"); // August 1, 2025 8pm UTC
-    const endDate = new Date("2025-11-23T08:00:00Z"); // November 23, 2025 8am UTC
+    const endDate = new Date(); // Today
+    endDate.setHours(23, 59, 59, 999); // End of today
 
-    // Anomaly injection periods
-    const nighttimeAnomalyStart = new Date("2025-08-10T00:00:00Z");
-    const nighttimeAnomalyEnd = new Date("2025-08-12T23:59:59Z");
-    const zeroGenerationAnomalyStart = new Date("2025-08-20T00:00:00Z");
-    const zeroGenerationAnomalyEnd = new Date("2025-08-22T23:59:59Z");
-    const thresholdCapacityAnomalyStart = new Date("2025-09-05T00:00:00Z");
-    const thresholdCapacityAnomalyEnd = new Date("2025-09-07T23:59:59Z");
-    const weatherMismatchAnomalyStart = new Date("2025-09-15T00:00:00Z");
-    const weatherMismatchAnomalyEnd = new Date("2025-09-17T23:59:59Z");
-    const frozenGenerationAnomalyStart = new Date("2025-09-25T00:00:00Z");
-    const frozenGenerationAnomalyEnd = new Date("2025-09-26T23:59:59Z");
+    const startDate = new Date(endDate);
+    startDate.setDate(startDate.getDate() - 90); // 90 days ago
+    startDate.setHours(0, 0, 0, 0); // Start of that day
+
+    // Anomaly injection periods (relative to today - spread across the 90 days)
+    // Place anomalies at specific intervals for testing
+    const nighttimeAnomalyStart = new Date(endDate);
+    nighttimeAnomalyStart.setDate(nighttimeAnomalyStart.getDate() - 80); // 80 days ago
+    const nighttimeAnomalyEnd = new Date(nighttimeAnomalyStart);
+    nighttimeAnomalyEnd.setDate(nighttimeAnomalyEnd.getDate() + 2); // 2-day period
+
+    const zeroGenerationAnomalyStart = new Date(endDate);
+    zeroGenerationAnomalyStart.setDate(zeroGenerationAnomalyStart.getDate() - 70); // 70 days ago
+    const zeroGenerationAnomalyEnd = new Date(zeroGenerationAnomalyStart);
+    zeroGenerationAnomalyEnd.setDate(zeroGenerationAnomalyEnd.getDate() + 2);
+
+    const thresholdCapacityAnomalyStart = new Date(endDate);
+    thresholdCapacityAnomalyStart.setDate(thresholdCapacityAnomalyStart.getDate() - 55); // 55 days ago
+    const thresholdCapacityAnomalyEnd = new Date(thresholdCapacityAnomalyStart);
+    thresholdCapacityAnomalyEnd.setDate(thresholdCapacityAnomalyEnd.getDate() + 2);
+
+    const weatherMismatchAnomalyStart = new Date(endDate);
+    weatherMismatchAnomalyStart.setDate(weatherMismatchAnomalyStart.getDate() - 45); // 45 days ago
+    const weatherMismatchAnomalyEnd = new Date(weatherMismatchAnomalyStart);
+    weatherMismatchAnomalyEnd.setDate(weatherMismatchAnomalyEnd.getDate() + 2);
+
+    const frozenGenerationAnomalyStart = new Date(endDate);
+    frozenGenerationAnomalyStart.setDate(frozenGenerationAnomalyStart.getDate() - 35); // 35 days ago
+    const frozenGenerationAnomalyEnd = new Date(frozenGenerationAnomalyStart);
+    frozenGenerationAnomalyEnd.setDate(frozenGenerationAnomalyEnd.getDate() + 1);
 
     let currentDate = new Date(startDate);
     let recordCount = 0;
@@ -228,13 +247,13 @@ async function seed() {
     await EnergyGenerationRecord.insertMany(records);
 
     console.log(
-      `Database seeded successfully. Generated ${recordCount} energy generation records from ${startDate.toUTCString()} to ${endDate.toUTCString()}.`
+      `Database seeded successfully. Generated ${recordCount} energy generation records from ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}.`
     );
-    console.log(`Injected ${nighttimeAnomalyCount} NIGHTTIME_GENERATION anomalies (Aug 10-12, 2025).`);
-    console.log(`Injected ${zeroGenerationAnomalyCount} ZERO_GENERATION_CLEAR_SKY anomalies (Aug 20-22, 2025).`);
-    console.log(`Injected ${thresholdCapacityAnomalyCount} ENERGY_EXCEEDING_THRESHOLD anomalies (Sep 5-7, 2025).`);
-    console.log(`Injected ${weatherMismatchAnomalyCount} WEATHER_MISMATCH anomalies (Sep 15-17, 2025).`);
-    console.log(`Injected ${frozenGenerationAnomalyCount} FROZEN_GENERATION anomalies (Sep 25-26, 2025).`);
+    console.log(`Injected ${nighttimeAnomalyCount} NIGHTTIME_GENERATION anomalies (~80 days ago).`);
+    console.log(`Injected ${zeroGenerationAnomalyCount} ZERO_GENERATION_CLEAR_SKY anomalies (~70 days ago).`);
+    console.log(`Injected ${thresholdCapacityAnomalyCount} ENERGY_EXCEEDING_THRESHOLD anomalies (~55 days ago).`);
+    console.log(`Injected ${weatherMismatchAnomalyCount} WEATHER_MISMATCH anomalies (~45 days ago).`);
+    console.log(`Injected ${frozenGenerationAnomalyCount} FROZEN_GENERATION anomalies (~35 days ago).`);
   } catch (err) {
     console.error("Seeding error:", err);
   } finally {
